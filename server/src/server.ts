@@ -1,6 +1,8 @@
 import Groq from "groq-sdk";
-
+import { getSystemPrompts } from "./prompts";
 // Initialize Groq client with API Key
+
+const systemPrompt = getSystemPrompts();
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY, // Make sure your API key is stored in an environment variable
 });
@@ -23,7 +25,7 @@ export async function main() {
         // Format and display the content dynamically as each chunk arrives
         const formattedOutput = formatResponse(fullResponse);
         console.clear(); // Clear the console for live updates
-        console.log(formattedOutput);
+        console.log(formattedOutput.fullContent);
       }
     }
   } catch (error) {
@@ -37,8 +39,12 @@ export async function getGroqChatStream() {
     // Required parameters
     messages: [
       {
+        role: "system",
+        content: systemPrompt,
+      },
+      {
         role: "user",
-        content: "create a todo application in react",
+        content: "create a todo application in nextjs",
       },
     ],
 
@@ -57,11 +63,7 @@ export async function getGroqChatStream() {
 function formatResponse(fullContent: string) {
   // Format the response as a structured object or text (you can customize this as needed)
   return {
-    status: "success",
-    message: "Streaming response received from the Groq model.",
-    data: {
-      content: fullContent, // Accumulated content from the model
-    },
+    fullContent,
   };
 }
 

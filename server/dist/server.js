@@ -22,7 +22,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.main = main;
 exports.getGroqChatStream = getGroqChatStream;
 const groq_sdk_1 = __importDefault(require("groq-sdk"));
+const prompts_1 = require("./prompts");
 // Initialize Groq client with API Key
+const systemPrompt = (0, prompts_1.getSystemPrompts)();
 const groq = new groq_sdk_1.default({
     apiKey: process.env.GROQ_API_KEY, // Make sure your API key is stored in an environment variable
 });
@@ -47,7 +49,7 @@ function main() {
                         // Format and display the content dynamically as each chunk arrives
                         const formattedOutput = formatResponse(fullResponse);
                         console.clear(); // Clear the console for live updates
-                        console.log(formattedOutput);
+                        console.log(formattedOutput.fullContent);
                     }
                 }
             }
@@ -71,8 +73,12 @@ function getGroqChatStream() {
             // Required parameters
             messages: [
                 {
+                    role: "system",
+                    content: systemPrompt,
+                },
+                {
                     role: "user",
-                    content: "create a todo application in react",
+                    content: "create a todo application in nextjs",
                 },
             ],
             model: "llama-3.3-70b-versatile", // Specify the model to be used
@@ -89,11 +95,7 @@ function getGroqChatStream() {
 function formatResponse(fullContent) {
     // Format the response as a structured object or text (you can customize this as needed)
     return {
-        status: "success",
-        message: "Streaming response received from the Groq model.",
-        data: {
-            content: fullContent, // Accumulated content from the model
-        },
+        fullContent,
     };
 }
 // Start the main function
