@@ -8,95 +8,92 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __asyncValues = (this && this.__asyncValues) || function (o) {
-    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
-    var m = o[Symbol.asyncIterator], i;
-    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
-    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
-    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.main = main;
-exports.getGroqChatStream = getGroqChatStream;
+require("dotenv").config();
+const express_1 = __importDefault(require("express"));
 const groq_sdk_1 = __importDefault(require("groq-sdk"));
+const cors_1 = __importDefault(require("cors"));
 const prompts_1 = require("./prompts");
+const node_1 = require("./default/node");
+const react_1 = require("./default/react");
+const app = (0, express_1.default)();
+app.use((0, cors_1.default)());
+app.use(express_1.default.json());
 // Initialize Groq client with API Key
-const systemPrompt = (0, prompts_1.getSystemPrompts)();
 const groq = new groq_sdk_1.default({
-    apiKey: process.env.GROQ_API_KEY, // Make sure your API key is stored in an environment variable
+    apiKey: process.env.GROQ_API_KEY,
 });
-function main() {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, e_1, _b, _c;
-        var _d, _e;
-        try {
-            const stream = yield getGroqChatStream();
-            let fullResponse = ""; // Accumulate the complete response here
-            try {
-                // Iterating through the stream with async iteration
-                for (var _f = true, stream_1 = __asyncValues(stream), stream_1_1; stream_1_1 = yield stream_1.next(), _a = stream_1_1.done, !_a; _f = true) {
-                    _c = stream_1_1.value;
-                    _f = false;
-                    const chunk = _c;
-                    // Get the content chunk (if available)
-                    const content = ((_e = (_d = chunk.choices[0]) === null || _d === void 0 ? void 0 : _d.delta) === null || _e === void 0 ? void 0 : _e.content) || "";
-                    if (content) {
-                        // Append the content to the full response
-                        fullResponse += content;
-                        // Format and display the content dynamically as each chunk arrives
-                        const formattedOutput = formatResponse(fullResponse);
-                        console.clear(); // Clear the console for live updates
-                        console.log(formattedOutput.fullContent);
-                    }
-                }
-            }
-            catch (e_1_1) { e_1 = { error: e_1_1 }; }
-            finally {
-                try {
-                    if (!_f && !_a && (_b = stream_1.return)) yield _b.call(stream_1);
-                }
-                finally { if (e_1) throw e_1.error; }
-            }
-        }
-        catch (error) {
-            console.error("Error while streaming:", error);
-        }
-    });
-}
-// Function to get the Groq streaming chat completion
-function getGroqChatStream() {
-    return __awaiter(this, void 0, void 0, function* () {
-        return groq.chat.completions.create({
-            // Required parameters
+// Define the system prompt for classification
+const systemPrompt = "Return either 'node' or 'react' based on what this project should be. Only return a single word: 'node' or 'react'. Do not return anything extra.";
+app.post("/template", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
+    const { prompt } = req.body;
+    console.log(prompt);
+    try {
+        // Send the classification request to Groq
+        const response = yield groq.chat.completions.create({
             messages: [
-                {
-                    role: "system",
-                    content: systemPrompt,
-                },
-                {
-                    role: "user",
-                    content: "create a todo application in nextjs",
-                },
+                { role: "system", content: systemPrompt },
+                { role: "user", content: prompt },
             ],
-            model: "llama-3.3-70b-versatile", // Specify the model to be used
-            // Optional parameters
-            temperature: 0.5, // Controls randomness of completions
-            max_tokens: 1024, // Limits the number of tokens generated
-            top_p: 1, // Nucleus sampling
-            stop: null, // Optional stop sequence to end completion
-            stream: true, // Enable streaming of responses
+            model: "llama-3.3-70b-versatile", // Specify the model
+            temperature: 0.5,
+            max_tokens: 10,
+        }, {
+            stream: true,
         });
+        console.log((_a = response.choices[0]) === null || _a === void 0 ? void 0 : _a.message.content);
+        const answer = (_d = (_c = (_b = response.choices[0]) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.content) === null || _d === void 0 ? void 0 : _d.trim().toLowerCase();
+        if (answer === "react") {
+            res.json({
+                prompts: [
+                    prompts_1.BASE_PROMPT,
+                    `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${react_1.basePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
+                ],
+                uiPrompts: [react_1.basePrompt],
+            });
+            return;
+        }
+        if (answer === "node") {
+            res.json({
+                prompts: [
+                    `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${node_1.basePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
+                ],
+                uiPrompts: [node_1.basePrompt],
+            });
+            return;
+        }
+        // If the response is invalid or unexpected
+        res
+            .status(403)
+            .json({ message: "Invalid classification or unsupported project type." });
+    }
+    catch (error) {
+        console.error("Error during Groq classification:", error);
+        res
+            .status(500)
+            .json({ message: "Internal server error", error: error.message });
+    }
+}));
+app.post("/chat", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const messages = req.body.messages;
+    const response = yield groq.chat.completions.create({
+        messages: [
+            { role: "system", content: (0, prompts_1.getSystemPrompts)() },
+            { role: "user", content: messages },
+        ],
+        model: "llama-3.3-70b-versatile", // Specify the model
+        temperature: 0.5,
+        max_tokens: 10,
     });
-}
-// Function to format the response
-function formatResponse(fullContent) {
-    // Format the response as a structured object or text (you can customize this as needed)
-    return {
-        fullContent,
-    };
-}
-// Start the main function
-main();
+    console.log(response);
+    res.json({});
+}));
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});

@@ -1,71 +1,98 @@
+require("dotenv").config();
+import express from "express";
 import Groq from "groq-sdk";
-import { getSystemPrompts } from "./prompts";
-// Initialize Groq client with API Key
+import cors from "cors";
+import { BASE_PROMPT, getSystemPrompts } from "./prompts";
+import { basePrompt as nodeBasePrompt } from "./default/node";
+import { basePrompt as reactBasePrompt } from "./default/react";
 
-const systemPrompt = getSystemPrompts();
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// Initialize Groq client with API Key
 const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY, // Make sure your API key is stored in an environment variable
+  apiKey: process.env.GROQ_API_KEY,
 });
 
-export async function main() {
+// Define the system prompt for classification
+const systemPrompt =
+  "Return either 'node' or 'react' based on what this project should be. Only return a single word: 'node' or 'react'. Do not return anything extra.";
+
+app.post("/template", async (req, res) => {
+  const { prompt } = req.body;
+  console.log(prompt);
+
   try {
-    const stream = await getGroqChatStream();
-
-    let fullResponse = ""; // Accumulate the complete response here
-
-    // Iterating through the stream with async iteration
-    for await (const chunk of stream) {
-      // Get the content chunk (if available)
-      const content = chunk.choices[0]?.delta?.content || "";
-
-      if (content) {
-        // Append the content to the full response
-        fullResponse += content;
-
-        // Format and display the content dynamically as each chunk arrives
-        const formattedOutput = formatResponse(fullResponse);
-        console.clear(); // Clear the console for live updates
-        console.log(formattedOutput.fullContent);
+    // Send the classification request to Groq
+    const response = await groq.chat.completions.create(
+      {
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ],
+        model: "llama-3.3-70b-versatile", // Specify the model
+        temperature: 0.5,
+        max_tokens: 10,
+      },
+      {
+        stream: true,
       }
+    );
+    console.log(response.choices[0]?.message.content);
+    const answer = response.choices[0]?.message?.content?.trim().toLowerCase();
+
+    if (answer === "react") {
+      res.json({
+        prompts: [
+          BASE_PROMPT,
+          `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
+        ],
+        uiPrompts: [reactBasePrompt],
+      });
+      return;
     }
-  } catch (error) {
-    console.error("Error while streaming:", error);
+
+    if (answer === "node") {
+      res.json({
+        prompts: [
+          `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${nodeBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
+        ],
+        uiPrompts: [nodeBasePrompt],
+      });
+      return;
+    }
+
+    // If the response is invalid or unexpected
+    res
+      .status(403)
+      .json({ message: "Invalid classification or unsupported project type." });
+  } catch (error: any) {
+    console.error("Error during Groq classification:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
-}
+});
 
-// Function to get the Groq streaming chat completion
-export async function getGroqChatStream() {
-  return groq.chat.completions.create({
-    // Required parameters
+app.post("/chat", async (req, res) => {
+  const messages = req.body.messages;
+
+  const response = await groq.chat.completions.create({
     messages: [
-      {
-        role: "system",
-        content: systemPrompt,
-      },
-      {
-        role: "user",
-        content: "create a todo application in nextjs",
-      },
+      { role: "system", content: getSystemPrompts() },
+      { role: "user", content: messages },
     ],
-
-    model: "llama-3.3-70b-versatile", // Specify the model to be used
-
-    // Optional parameters
-    temperature: 0.5, // Controls randomness of completions
-    max_tokens: 1024, // Limits the number of tokens generated
-    top_p: 1, // Nucleus sampling
-    stop: null, // Optional stop sequence to end completion
-    stream: true, // Enable streaming of responses
+    model: "llama-3.3-70b-versatile", // Specify the model
+    temperature: 0.5,
+    max_tokens: 10,
   });
-}
 
-// Function to format the response
-function formatResponse(fullContent: string) {
-  // Format the response as a structured object or text (you can customize this as needed)
-  return {
-    fullContent,
-  };
-}
-
-// Start the main function
-main();
+  console.log(response);
+  res.json({});
+});
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
