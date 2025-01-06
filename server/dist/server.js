@@ -79,18 +79,27 @@ app.post("/template", (req, res) => __awaiter(void 0, void 0, void 0, function* 
     }
 }));
 app.post("/chat", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const messages = req.body.messages;
-    const response = yield groq.chat.completions.create({
-        messages: [
-            { role: "system", content: (0, prompts_1.getSystemPrompts)() },
-            { role: "user", content: messages },
-        ],
-        model: "llama-3.3-70b-versatile", // Specify the model
-        temperature: 0.5,
-        max_tokens: 10,
-    });
-    console.log(response);
-    res.json({});
+    var _a, _b;
+    try {
+        const { messages } = req.body;
+        const systemPrompt = (0, prompts_1.getSystemPrompts)(); // Ensure this function returns a string
+        const response = yield groq.chat.completions.create({
+            messages: [{ role: "system", content: systemPrompt }, ...messages],
+            model: "llama-3.3-70b-versatile", // Replace with your desired model
+            max_tokens: 8000,
+        }, {
+            stream: true,
+        });
+        const assistantReply = (_b = (_a = response.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content;
+        // Log the response for debugging
+        console.log(assistantReply);
+        // Send the assistant's reply back to the client
+        res.json({ response: assistantReply });
+    }
+    catch (error) {
+        console.error("Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
 }));
 // Start the server
 const PORT = process.env.PORT || 3000;

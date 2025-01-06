@@ -76,20 +76,31 @@ app.post("/template", async (req, res) => {
 });
 
 app.post("/chat", async (req, res) => {
-  const messages = req.body.messages;
+  try {
+    const { messages } = req.body;
 
-  const response = await groq.chat.completions.create({
-    messages: [
-      { role: "system", content: getSystemPrompts() },
-      { role: "user", content: messages },
-    ],
-    model: "llama-3.3-70b-versatile", // Specify the model
-    temperature: 0.5,
-    max_tokens: 10,
-  });
+    const systemPrompt = getSystemPrompts(); // Ensure this function returns a string
+    const response = await groq.chat.completions.create(
+      {
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        model: "llama-3.3-70b-versatile", // Replace with your desired model
+        max_tokens: 8000,
+      },
+      {
+        stream: true,
+      }
+    );
+    const assistantReply = response.choices[0]?.message?.content;
 
-  console.log(response);
-  res.json({});
+    // Log the response for debugging
+    console.log(assistantReply);
+
+    // Send the assistant's reply back to the client
+    res.json({ response: assistantReply });
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 // Start the server
 const PORT = process.env.PORT || 3000;
