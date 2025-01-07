@@ -18,22 +18,29 @@ const groq = new Groq({
 // Define the system prompt for classification
 const systemPrompt =
   "Return either 'node' or 'react' based on what this project should be. Only return a single word: 'node' or 'react'. Do not return anything extra.";
-
 app.post("/template", async (req, res) => {
   const { prompt } = req.body;
   console.log(prompt);
 
   try {
+    // Pre-process the prompt
+    const processedPrompt = prompt
+      .toLowerCase()
+      .replace(/[^\w\s]|_/g, "")
+      .trim();
+
+    console.log(`Processed prompt: ${processedPrompt}`);
+
     // Send the classification request to Groq
     const response = await groq.chat.completions.create(
       {
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: prompt },
+          { role: "user", content: processedPrompt },
         ],
         model: "llama-3.3-70b-versatile", // Specify the model
         temperature: 0.5,
-        max_tokens: 10,
+        max_tokens: 1024,
       },
       {
         stream: true,
@@ -42,23 +49,33 @@ app.post("/template", async (req, res) => {
     console.log(response.choices[0]?.message.content);
     const answer = response.choices[0]?.message?.content?.trim().toLowerCase();
 
-    if (answer === "react") {
+    console.log("answer", answer);
+    if (
+      answer?.includes("node") ||
+      answer?.includes("nodejs") ||
+      answer?.includes("node js")
+    ) {
+      res.json({
+        prompts: [
+          BASE_PROMPT,
+          `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${nodeBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
+        ],
+        uiPrompts: [nodeBasePrompt],
+      });
+      return;
+    }
+
+    if (
+      answer?.includes("react") ||
+      answer?.includes("react js") ||
+      answer?.includes("reactjs")
+    ) {
       res.json({
         prompts: [
           BASE_PROMPT,
           `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
         ],
         uiPrompts: [reactBasePrompt],
-      });
-      return;
-    }
-
-    if (answer === "node") {
-      res.json({
-        prompts: [
-          `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${nodeBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
-        ],
-        uiPrompts: [nodeBasePrompt],
       });
       return;
     }
@@ -79,11 +96,12 @@ app.post("/chat", async (req, res) => {
   try {
     const { messages } = req.body;
 
-    const systemPrompt = getSystemPrompts(); // Ensure this function returns a string
+    const systemPrompt = getSystemPrompts();
     const response = await groq.chat.completions.create(
       {
         messages: [{ role: "system", content: systemPrompt }, ...messages],
-        model: "llama-3.3-70b-versatile", // Replace with your desired model
+        model: "llama-3.3-70b-versatile",
+
         max_tokens: 8000,
       },
       {
@@ -92,7 +110,6 @@ app.post("/chat", async (req, res) => {
     );
     const assistantReply = response.choices[0]?.message?.content;
 
-    // Log the response for debugging
     console.log(assistantReply);
 
     // Send the assistant's reply back to the client
