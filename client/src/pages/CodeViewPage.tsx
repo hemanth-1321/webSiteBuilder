@@ -21,6 +21,7 @@ export default function CodeViewPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [editorContent, setEditorContent] = useState("");
 
   const [isCodeView, setIsCodeView] = useState(true); // Toggle between code and preview view
 
@@ -95,6 +96,10 @@ export default function CodeViewPage() {
     console.log(files);
   }, [steps, files]);
 
+  const handleFileSelect = (file: any) => {
+    setSelectedFile(file);
+    setEditorContent(file.content); // Update editor content immediately
+  };
   async function init() {
     try {
       setLoading(true);
@@ -220,7 +225,7 @@ export default function CodeViewPage() {
                 {files.map((file) => (
                   <button
                     key={file.name}
-                    onClick={() => setSelectedFile(file)}
+                    onClick={() => handleFileSelect(file)}
                     className={`w-full text-left px-3 py-2 rounded ${
                       selectedFile?.name === file.name
                         ? "bg-blue-50 text-blue-600"
@@ -264,8 +269,8 @@ export default function CodeViewPage() {
                     height="100%"
                     width="100%"
                     defaultLanguage={selectedFile.language}
-                    defaultValue={selectedFile.content}
-                    theme="vs-light"
+                    value={editorContent}
+                    theme="hc-black"
                     options={{
                       minimap: { enabled: false },
                       fontSize: 14,
