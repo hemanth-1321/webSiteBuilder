@@ -22,4 +22,5 @@ export interface FileItem {
   children?: FileItem[];
   content?: string;
   path: string;
+  language?: string;
 }

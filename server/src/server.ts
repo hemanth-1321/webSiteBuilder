@@ -38,7 +38,7 @@ app.post("/template", async (req, res) => {
           { role: "system", content: systemPrompt },
           { role: "user", content: processedPrompt },
         ],
-        model: "llama-3.3-70b-versatile", // Specify the model
+        model: "llama-3.3-70b-Specdec", // Specify the model
         temperature: 0.5,
         max_tokens: 1024,
       },
@@ -100,7 +100,7 @@ app.post("/chat", async (req, res) => {
     const response = await groq.chat.completions.create(
       {
         messages: [{ role: "system", content: systemPrompt }, ...messages],
-        model: "llama-3.3-70b-versatile",
+        model: "llama-3.3-70b-Specdec",
 
         max_tokens: 8000,
       },
